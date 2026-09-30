@@ -3,7 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"net"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -175,6 +178,8 @@ func portExpansion(portsToScan string) ([]int, error) {
 func main() {
 	host := flag.String("host", "127.0.0.1", "Host to scan, default is localhost")
 	portsToScan := flag.String("ports", top1000Ports, "Ports to scan: e.g. 22,80,443,8000-9000, default is top 1000 ports")
+	logFlag := flag.Bool("log", false, "Write output to file, default is false")
+	outputFile := flag.String("filename", "", "Name of file to save to, if not set it will be saved as <hostname>.scan")
 	workers := flag.Int("workers", 100, "Number of concurrent workers, default of 100")
 	timeout := flag.Duration("timeout", 2*time.Second, "Per-port dial/read timeout, default of 2 seconds")
 	flag.Parse()
@@ -219,12 +224,24 @@ func main() {
 
 	sort.Slice(open, func(i, j int) bool { return open[i].port < open[j].port })
 
-	fmt.Printf("Scanning %s (%d ports)\n", *host, len(targets))
+	writer := io.MultiWriter(os.Stdout)
+
+	if logFlag {
+		workingFile, err := os.OpenFile(*outputFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			fmt.Println("Error opening output file: ", err)
+			fmt.Println("Will continue without writing to file")
+			workingFile = nil
+		}
+		writer = io.MultiWriter(os.Stdout, workingFile)
+	}
+
+	fmt.Fprintf(writer, "Scanning %s (%d ports)\n", *host, len(targets))
 	if len(open) == 0 {
-		fmt.Println("No open ports found.")
+		fmt.Fprintln(writer, "No open ports found.")
 		return
 	}
 	for _, r := range open {
-		fmt.Printf("  %-6d/tcp  open  %s\n", r.port, r.service)
+		fmt.Fprintf(writer, "  %-6d/tcp  open  %s\n", r.port, r.service)
 	}
 }
