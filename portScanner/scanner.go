@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"sort"
@@ -208,7 +207,7 @@ func main() {
 
 	// Collector must finish before we sort; use its own WaitGroup to avoid the race.
 	var collectorWg sync.WaitGroup
-	wg.Go(func() {
+	collectorWg.Go(func() {
 		for r := range results {
 			open = append(open, r)
 		}
@@ -226,8 +225,14 @@ func main() {
 
 	writer := io.MultiWriter(os.Stdout)
 
-	if logFlag {
-		workingFile, err := os.OpenFile(*outputFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	filename := *host + ".scan"
+
+	if *outputFile != "" {
+		filename = *outputFile
+	}
+	
+	if *logFlag {
+		workingFile, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
 			fmt.Println("Error opening output file: ", err)
 			fmt.Println("Will continue without writing to file")
